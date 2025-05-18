@@ -10,7 +10,6 @@ import {
     WorkspaceConfiguration,
     ConfigurationTarget,
 } from "vscode";
-import supportedLanguages from "./supported-languages";
 
 export default class Formatter {
     private readonly FORMAT_DOCUMENT_ACTION = "editor.action.formatDocument";
@@ -37,7 +36,7 @@ export default class Formatter {
         context.subscriptions.push(
             commands.registerCommand("multiFormatter.formatSelection", this.formatSelection.bind(this)),
             commands.registerCommand("multiFormatter.formatDocument", this.formatDocument.bind(this)),
-            languages.registerDocumentRangeFormattingEditProvider(supportedLanguages, {
+            languages.registerDocumentRangeFormattingEditProvider("*", {
                 provideDocumentRangeFormattingEdits: this.selectFormattingAction.bind(this),
             }),
         );
