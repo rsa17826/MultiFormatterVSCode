@@ -19,7 +19,7 @@
 ;
 ; @endregex
 
-; @name seperate different regexes
+; @name separate different regexes
 ; @regex ( *)(;.*)\n(\1; @name)
 ; @full
 ; @replace $1$2
