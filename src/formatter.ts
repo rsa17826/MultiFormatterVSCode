@@ -54,6 +54,16 @@ export default class Formatter {
           this.selectFormattingAction.bind(this),
       })
     )
+    context.subscriptions.push(
+      workspace.onDidOpenTextDocument(async (doc) => {
+        await setDefaultFormatterIfNeeded(doc)
+      })
+    )
+
+    // Also handle the case where the extension is activated with a document already open
+    if (vsWindow.activeTextEditor) {
+      setDefaultFormatterIfNeeded(vsWindow.activeTextEditor.document)
+    }
   }
 
   selectFormattingAction(document: TextDocument, range: Range) {
@@ -224,8 +234,8 @@ export default class Formatter {
           }
           await wait(100)
         }
-        await commands.executeCommand(this.formatAction)
       }
+      await commands.executeCommand(this.formatAction)
     }
 
     if (this.config.get<boolean>("formatOnSave")) {
@@ -262,4 +272,83 @@ export default class Formatter {
 }
 function wait(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
+}
+async function setDefaultFormatterIfNeeded(document: TextDocument) {
+  // 1️⃣ Read the extension’s config for the document’s language
+  const extConfig = workspace.getConfiguration(
+    "multiFormatter",
+    document
+  )
+  const formatterList = extConfig.get<string[]>("formatterList", [])
+
+  // If there is no list for this language, do nothing
+  if (formatterList.length === 0) return
+
+  // 2️⃣ Get the current editor config for this document
+  const editorConfig = workspace.getConfiguration("editor", document)
+  const current = editorConfig.inspect<string | null>(
+    "defaultFormatter"
+  )
+
+  // 3️⃣ Determine where the setting lives (workspaceFolder → workspace → global)
+  const targetInfo = (() => {
+    const {
+      workspaceFolderLanguageValue,
+      workspaceFolderValue,
+      workspaceLanguageValue,
+      workspaceValue,
+      globalLanguageValue,
+    } = current ?? {}
+
+    if (
+      workspaceFolderLanguageValue !== undefined ||
+      workspaceFolderValue !== undefined
+    ) {
+      return {
+        target: ConfigurationTarget.WorkspaceFolder,
+        languageSpecific: workspaceFolderLanguageValue !== undefined,
+      }
+    }
+    if (
+      workspaceLanguageValue !== undefined ||
+      workspaceValue !== undefined
+    ) {
+      return {
+        target: ConfigurationTarget.Workspace,
+        languageSpecific: workspaceLanguageValue !== undefined,
+      }
+    }
+    return {
+      target: ConfigurationTarget.Global,
+      languageSpecific: globalLanguageValue !== undefined,
+    }
+  })()
+
+  // 4️⃣ If the formatter is already set to the multi‑formatter, skip
+  const existing = editorConfig.get<string | null>("defaultFormatter")
+  if (existing === "Jota0222.multi-formatter") return
+
+  // 5️⃣ Update the setting (retry logic similar to `runFormatters`)
+  let attempts = 0
+  while (true) {
+    try {
+      await editorConfig.update(
+        "defaultFormatter",
+        "Jota0222.multi-formatter",
+        targetInfo.target,
+        targetInfo.languageSpecific
+      )
+      break
+    } catch (e) {
+      attempts++
+      if (attempts > 7) {
+        console.error(
+          "Failed to set defaultFormatter after 7 attempts",
+          e
+        )
+        break
+      }
+      await wait(100)
+    }
+  }
 }
