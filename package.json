@@ -57,6 +57,7 @@
     "url": "https://github.com/jota0222/MultiFormatterVSCode.git"
   },
   "scripts": {
+     "compile": "tsc -p ./",
     "build": "tsc && vsce package",
     "vscode:prepublish": "tsc",
     "watch": "tsc --watch -p ./"
